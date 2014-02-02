@@ -28,9 +28,9 @@ class FPMCookery < FPM::Cookery::Recipe
 
   private
 
-  def gem_install(name, version = nil)
+  def gem_install(name, version = nil, extra_options = [])
     v = version.nil? ? '' : "-v #{version}"
-    cleanenv_safesystem "#{destdir}/embedded/bin/gem install --no-ri --no-rdoc #{v} #{name}"
+    cleanenv_safesystem "#{destdir}/embedded/bin/gem install --no-ri --no-rdoc #{v} #{name} #{extra_options.join(' ')}"
   end
 
   def create_post_install_hook

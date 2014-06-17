@@ -70,7 +70,7 @@ module FPM
           recipe.cachedir.mkdir
           Dir.chdir(recipe.cachedir) do
             Log.info "Fetching source: #{source.source_url}"
-            source.fetch
+            source.fetch(:quiet => config[:quiet])
 
             if source.checksum?
               SourceIntegrityCheck.new(recipe).tap do |check|
@@ -107,7 +107,8 @@ module FPM
               build_cookie = build_cookie_name(package_name)
 
               if File.exists?(build_cookie)
-                Log.info 'Skipping build (`fpm-cook clean` to rebuild)'
+                Log.warn "Skipping build of #{recipe.name} because build cookie found (#{build_cookie})," \
+                         " use \"fpm-cook clean\" to rebuild!"
               else
                 Log.info "Building in #{File.expand_path(extracted_source, recipe.builddir)}"
                 recipe.build and FileUtils.touch(build_cookie)
@@ -149,7 +150,7 @@ module FPM
 
           input = recipe.input(config)
 
-          input.version = version.to_s
+          input.version = version
           input.maintainer = maintainer.to_s
           input.vendor = version.vendor if version.vendor
           input.epoch = version.epoch if version.epoch

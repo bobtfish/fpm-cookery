@@ -9,18 +9,18 @@ module FPM
         NAME = :curl
         CHECKSUM = true
 
-        def fetch
+        def fetch(config = {})
           if local_path.exist?
             Log.info "Using cached file #{local_path}"
           else
             Dir.chdir(cachedir) do
-              curl(url, local_path) unless local_path.exist?
+              curl(url, local_path, config) unless local_path.exist?
             end
           end
           local_path
         end
 
-        def extract
+        def extract(config = {})
           Dir.chdir(builddir) do
             case local_path.extname
             when '.bz2', '.gz', '.tgz'
@@ -42,9 +42,11 @@ module FPM
         end
 
         private
-        def curl(url, path)
+        def curl(url, path, config)
           args = options[:args] || '-fL'
-          cmd = ['curl', args, '--progress-bar', '-o', path, url]
+          cmd = ['curl', args]
+          cmd << (config[:quiet] ? '-s' : '--progress-bar')
+          cmd += ['-o', path, url]
           safesystem(*cmd)
         rescue RuntimeError => e
           Log.error("Command failed: #{cmd.join(' ')}")

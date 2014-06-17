@@ -17,9 +17,18 @@ module FPM
       option ['-D', '--debug'], :flag, 'enable debug output'
       option ['-t', '--target'], 'TARGET', 'set desired fpm output target (deb, rpm, etc)'
       option ['-p', '--platform'], 'PLATFORM', 'set the target platform (centos, ubuntu, debian)'
+      option ['-q', '--quiet'], :flag, 'Disable verbose output like progress bars'
       option ['-V', '--version'], :flag, 'show fpm-cookery and fpm version'
       option '--[no-]deps', :flag, 'enable/disable dependency checking',
         :attribute_name => 'dependency_check'
+      option '--tmp-root', 'DIR', 'directory root for temporary files',
+        :attribute_name => 'tmp_root'
+      option '--pkg-dir', 'DIR', 'directory for built packages',
+        :attribute_name => 'pkg_dir'
+      option '--cache-dir', 'DIR', 'directory for downloaded sources',
+        :attribute_name => 'cache_dir'
+      option '--skip-package', :flag, 'do not call FPM to build the package',
+        :attribute_name => 'skip_package'
 
       class Command < self
         def recipe_file
@@ -61,8 +70,8 @@ module FPM
 
           FPM::Cookery::BaseRecipe.send(:include, FPM::Cookery::BookHook)
 
-          FPM::Cookery::Book.instance.load_recipe(recipe_file) do |recipe|
-            packager = FPM::Cookery::Packager.new(recipe, :dependency_check => config.dependency_check)
+          FPM::Cookery::Book.instance.load_recipe(recipe_file, config) do |recipe|
+            packager = FPM::Cookery::Packager.new(recipe, config.to_hash)
             packager.target = FPM::Cookery::Facts.target.to_s
 
             exec(config, recipe, packager)
@@ -97,9 +106,9 @@ module FPM
 
         def exec(config, recipe, packager)
           if recipe.omnibus_package == true
-            FPM::Cookery::OmnibusPackager.new(packager).run
+            FPM::Cookery::OmnibusPackager.new(packager, config).run
           elsif recipe.chain_package == true
-            FPM::Cookery::ChainPackager.new(packager, :dependency_check => config.dependency_check).run
+            FPM::Cookery::ChainPackager.new(packager, config).run
           else
             packager.dispense
           end

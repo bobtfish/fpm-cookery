@@ -5,8 +5,12 @@ require 'fpm/cookery/source'
 require 'fpm/cookery/source_handler'
 require 'fpm/cookery/utils'
 require 'fpm/cookery/path_helper'
+require 'fpm/cookery/package/cpan'
 require 'fpm/cookery/package/dir'
 require 'fpm/cookery/package/gem'
+require 'fpm/cookery/package/npm'
+require 'fpm/cookery/package/pear'
+require 'fpm/cookery/package/python'
 
 module FPM
   module Cookery
@@ -27,6 +31,13 @@ module FPM
             end
           }
         end
+      end
+
+      def self.inherited(klass)
+        super
+        # Apply class data inheritable pattern to @fpm_attributes
+        # class variable.
+        klass.instance_variable_set(:@fpm_attributes, self.fpm_attributes.dup)
       end
 
       def self.platforms(valid_platforms)
@@ -62,7 +73,7 @@ module FPM
 
       attr_rw_list :build_depends, :config_files, :conflicts, :depends,
                    :exclude, :patches, :provides, :replaces, :omnibus_recipes,
-                   :omnibus_additional_paths, :chain_recipes
+                   :omnibus_additional_paths, :chain_recipes, :directories
 
       attr_reader :filename
 
@@ -74,34 +85,52 @@ module FPM
         def depends_all
           (depends + build_depends).uniq
         end
+
+        # Supports both hash and argument assignment
+        #   fpm_attributes[:attr1] = xxxx
+        #   fpm_attributes :xxxx=>1, :yyyy=>2
+        def fpm_attributes(args=nil)
+          if args.is_a?(Hash)
+            @fpm_attributes.merge!(args)
+          end
+          @fpm_attributes
+        end
       end
+      @fpm_attributes = {}
 
-      def initialize(filename)
+      def initialize(filename, config)
         @filename = Path.new(filename).expand_path
+        @config = config
 
-        # Set some defaults.
-        vendor || self.class.vendor('fpm')
-        revision || self.class.revision(0)
+        @workdir = @filename.dirname
+        @tmp_root = @config.tmp_root ? Path.new(@config.tmp_root) : @workdir
+        @pkgdir = @config.pkg_dir && Path.new(@config.pkg_dir)
+        @cachedir = @config.cache_dir && Path.new(@config.cache_dir)
       end
 
       def workdir=(value)  @workdir  = Path.new(value) end
+      def tmp_root=(value) @tmp_root = Path.new(value) end
       def destdir=(value)  @destdir  = Path.new(value) end
       def builddir=(value) @builddir = Path.new(value) end
       def pkgdir=(value)   @pkgdir   = Path.new(value) end
       def cachedir=(value) @cachedir = Path.new(value) end
 
-      def workdir(path = nil)  (@workdir  ||= filename.dirname)/path       end
-      def destdir(path = nil)  (@destdir  ||= workdir('tmp-dest'))/path    end
-      def builddir(path = nil) (@builddir ||= workdir('tmp-build'))/path   end
-      def pkgdir(path = nil)   (@pkgdir   ||= workdir('pkg'))/path         end
-      def cachedir(path = nil) (@cachedir ||= workdir('cache'))/path       end
+      def workdir(path = nil)  @workdir/path                               end
+      def tmp_root(path = nil) @tmp_root/path                              end
+      def destdir(path = nil)  (@destdir  || tmp_root('tmp-dest'))/path    end
+      def builddir(path = nil) (@builddir || tmp_root('tmp-build'))/path   end
+      def pkgdir(path = nil)   (@pkgdir   || workdir('pkg'))/path         end
+      def cachedir(path = nil) (@cachedir || workdir('cache'))/path       end
+      def fpm_attributes() self.class.fpm_attributes end
 
       # Resolve dependencies from omnibus package.
       def depends_all
         pkg_depends = self.class.depends_all
         if self.class.omnibus_package
           self.class.omnibus_recipes.each { |omni_recipe|
-            Book.instance.load_recipe(File.expand_path(omni_recipe + '.rb', File.dirname(filename))) do |recipe|
+            recipe_file = File.expand_path(omni_recipe + '.rb', File.dirname(filename))
+
+            Book.instance.load_recipe(recipe_file, config) do |recipe|
               pkg_depends << recipe.depends_all
             end
           }
@@ -116,8 +145,8 @@ module FPM
         FPM::Cookery::Package::Dir.new(self, config)
       end
 
-      def initialize(filename)
-        super(filename)
+      def initialize(filename, config)
+        super(filename, config)
         @source_handler = SourceHandler.new(Source.new(source, spec), cachedir, builddir)
       end
 
@@ -143,6 +172,32 @@ module FPM
     class RubyGemRecipe < BaseRecipe
       def input(config)
         FPM::Cookery::Package::Gem.new(self, config)
+      end
+    end
+
+    class NPMRecipe < BaseRecipe
+      def input(config)
+        FPM::Cookery::Package::NPM.new(self, config)
+      end
+    end
+
+    class PythonRecipe < BaseRecipe
+      def input(config)
+        FPM::Cookery::Package::Python.new(self, config)
+      end
+    end
+
+    class CPANRecipe < BaseRecipe
+      def input(config)
+        FPM::Cookery::Package::CPAN.new(self, config)
+      end
+    end
+
+    class PEARRecipe < BaseRecipe
+      attr_rw :pear_package_name_prefix, :pear_channel, :pear_php_dir
+
+      def input(config)
+        FPM::Cookery::Package::PEAR.new(self, config)
       end
     end
   end

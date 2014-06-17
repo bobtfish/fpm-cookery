@@ -6,7 +6,8 @@ module FPM
     class Config
       ATTRIBUTES = [
         :color, :debug, :target, :platform, :maintainer, :vendor,
-        :skip_package, :keep_destdir, :dependency_check
+        :skip_package, :keep_destdir, :dependency_check, :quiet,
+        :tmp_root, :pkg_dir, :cache_dir
       ].freeze
 
       DEFAULTS = {
@@ -14,7 +15,8 @@ module FPM
         :debug => false,
         :dependency_check => true,
         :skip_package => false,
-        :keep_destdir => false
+        :keep_destdir => false,
+        :quiet => false
       }.freeze
 
       def self.load_file(paths)

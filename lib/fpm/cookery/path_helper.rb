@@ -30,6 +30,11 @@ module FPM
         current_pathname_for('var')/path
       end
 
+      def root(path = nil)
+        current_pathname_for(nil)/path
+      end
+      alias_method :root_prefix, :root
+
       def bin(path = nil)     prefix/'bin'/path            end
       def doc(path = nil)     prefix/'share/doc'/path      end
       def include(path = nil) prefix/'include'/path        end
